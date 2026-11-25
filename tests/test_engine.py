@@ -37,7 +37,11 @@ class TestTheRun(EngineTestCase):
 		self.assertEqual(events[1], ("step", {"step": "subject"}))
 		self.assertIn("check", kinds)
 		self.assertLess(kinds.index("plan"), kinds.index("test"))
-		self.assertEqual([data for kind, data in events if kind == "plan"], [{"tests": 3}])
+		plans = [data for kind, data in events if kind == "plan"]
+		self.assertEqual(len(plans), 1)
+		self.assertEqual(plans[0]["tests"], 3)
+		self.assertEqual(plans[0]["suites"], [{"key": "fds", "name": "file descriptors", "group": "The other tests",
+			"label": "file descriptors", "tests": 3}])
 		self.assertEqual(kinds.count("test"), 3)
 		self.assertEqual(len(report.results), 3)
 		self.assertIsNone(report.error)
@@ -72,6 +76,16 @@ class TestTheRun(EngineTestCase):
 		self.addCleanup(report.workspace.cleanup)
 		self.assertTrue((report.workspace.path / "get_next_line.c").is_file())
 
+class TestFewerMallocs(EngineTestCase):
+
+	def test_a_second_plan_with_the_mallocs_counted(self):
+		events = []
+		test_project(self.project(), norminette="", steps=("malloc_failures",), on_event=lambda kind, data:
+			events.append((kind, data)))
+		plans = [data for kind, data in events if kind == "plan"]
+		self.assertEqual([plan["tests"] for plan in plans], [20, 5])
+		self.assertEqual(plans[-1]["suites"][0]["tests"], 5)
+
 class TestTheJson(EngineTestCase):
 
 	def test_format_1(self):
@@ -79,7 +93,11 @@ class TestTheJson(EngineTestCase):
 		data = to_dict(report)
 		self.assertEqual((data["format"], data["tester"]), (1, "linerator"))
 		self.assertEqual(set(data), {"format", "tester", "version", "lang", "seed", "log", "error", "notes",
-			"conformity", "tests"})
+			"conformity", "tests", "suites"})
+		# The name and the row of each suite, for 42pal: BUFFER_SIZE=1 rather than buffer_1.
+		self.assertEqual(data["suites"][0], {"key": "buffer_1", "name": "BUFFER_SIZE=1", "group": "BUFFER_SIZE",
+			"label": "1", "tests": 16})
+		self.assertEqual(data["suites"][-1]["label"], "default")
 		self.assertTrue(any(test["status"] == "LEAK" for test in data["tests"]))
 		self.assertIn("BUFFER_SIZE", data["notes"][0])
 		self.assertEqual(failing_sizes(report.results)[0], "1")

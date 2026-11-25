@@ -125,7 +125,7 @@ RunScreen {
 }
 
 #sizes {
-	width: 46;
+	width: 50;
 	height: 100%;
 	border: round #2a2f3a;
 	border-title-color: #a5b4fc;

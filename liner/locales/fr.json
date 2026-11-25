@@ -37,7 +37,6 @@
  "The files of get_next_line are not at the root: the tests cannot run.": "Les fichiers de get_next_line ne sont pas à la racine : les tests ne peuvent pas tourner.",
  "The lines fail with BUFFER_SIZE: {sizes}": "Les lignes échouent avec BUFFER_SIZE : {sizes}",
  "The other tests": "Les autres tests",
- "The project": "Le projet",
  "The prototype of get_next_line in {header}": "Le prototype de get_next_line dans {header}",
  "The tests": "Les tests",
  "The visualizer needs get_next_line to compile: run the tests first.": "Le visualiseur a besoin que get_next_line compile : lance d'abord les tests.",
@@ -103,7 +102,6 @@
  "open or test": "ouvrir ou tester",
  "opened again after a failed read(): {difference} (the static is not cleared?)": "rouvert après un read() en échec : {difference} (la statique n'est pas vidée ?)",
  "play": "lecture",
- "project {passed}/{total}": "projet {passed}/{total}",
  "quit": "quitter",
  "read as little as possible": "lire le moins possible",
  "read() fails": "read() échoue",
@@ -145,10 +143,12 @@
  "{line} returned, NULL expected": "{line} renvoyé, NULL attendu",
  "{names}: maybe put there by the compiler": "{names} : peut-être ajouté par le compilateur",
  "{name} is starting…": "{name} démarre…",
- "{name} · the project: {count} checks": "{name} · le projet : {count} contrôles",
  "{name} · {phase} · tests {done}/{total} {bar} {bad} KO": "{name} · {phase} · tests {done}/{total} {bar} {bad} KO",
  "{read} bytes read before the first line": "{read} octets lus avant la première ligne",
  "{read} bytes read before the first line: {enough} are enough": "{read} octets lus avant la première ligne : {enough} suffisent",
  "… and {count} more": "… et {count} de plus",
- "✓ a get_next_line project: Enter tests it": "✓ un projet get_next_line : Entrée le teste"
+ "✓ a get_next_line project: Enter tests it": "✓ un projet get_next_line : Entrée le teste",
+ "The subject": "Le sujet",
+ "subject {passed}/{total}": "sujet {passed}/{total}",
+ "{name} · the subject: {count} checks": "{name} · le sujet : {count} contrôles"
 }

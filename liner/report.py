@@ -1,7 +1,9 @@
 """The results for other tools (42pal): the JSON of --json (format 1, like libfterator) and --stream.
 
 The JSON is written even when nothing could run. Its fields are those of
-libfterator; the notes say which BUFFER_SIZE fail, which 42pal shows.
+libfterator; the notes say which BUFFER_SIZE fail, and "suites" gives the
+name of each suite and the rows of the panel (names.suite_rows), so that
+42pal shows them like Linerator does.
 """
 
 import json
@@ -43,6 +45,7 @@ def to_dict(report, lang="en"):
 		"notes": notes(report),
 		"conformity": [check_dict(check) for check in report.checks],
 		"tests": [test_dict(result) for result in report.results],
+		"suites": report.suites,
 	}
 
 def to_json(report, path, lang="en"):

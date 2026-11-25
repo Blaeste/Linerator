@@ -2,8 +2,9 @@
 
 The home screen: the logo, and the folder of the project, typed or chosen
 in a live list (the projects found, the folders below what is typed). The
-run screen: the project and the failures as they come, each BUFFER_SIZE
-drawn test after test, then the whole report. Its look is in tui.tcss.
+run screen: the checks and the failures as they come, each suite drawn test
+after test (each BUFFER_SIZE first), then the whole report. Its look is in
+tui.tcss.
 """
 
 import os
@@ -22,10 +23,8 @@ from textual.widgets.option_list import Option
 from liner.cli import display
 from liner.cli.display import Progress, report_lines, short_path
 from liner.engine import test_project
-from liner.files import contents
 from liner.find import iter_projects, last_project, looks_like_project, remember_project
 from liner.i18n import N_, t
-from liner.suite import BUFFER_SIZES, label
 
 LETTERS = [
 	"██╗  ██╗██████╗ ██████╗  █████╗ ██╗     ",
@@ -268,51 +267,32 @@ class HomeScreen(Screen):
 			return
 		self.app.start_run(path)
 
-GOOD, BAD, WAITING = "#4ade80", "#f87171", "#2a2f3a"
+class SuitesPanel(Static):
+	"""Each suite as its tests come: a cell a test, green when it passes, red when not (display.suites_panel).
 
-class SizesPanel(Static):
-	"""Each BUFFER_SIZE as its tests come: a cell a file, green when it passes, red when not; then the other steps."""
+	Its rows come with the plan of the run: the BUFFER_SIZE first, then the other steps.
+	"""
 
 	def on_mount(self):
-		self.border_title = " BUFFER_SIZE "
+		self.border_title = f" {t('The tests')} "
 		self.reset()
 
-	def reset(self):
-		self.sizes = {label(size): [] for size in BUFFER_SIZES}
-		self.others = {}
+	def reset(self, rows=()):
+		self.rows = list(rows)
+		self.done = {}
+		self.paint()
+
+	def plan(self, rows):
+		self.rows = list(rows)
 		self.paint()
 
 	def add(self, name, status, paint=True):
-		suite = name.split("/", 1)[0]
-		good = status in ("PASS", "INFO", "WARN")
-		if suite.startswith("buffer_") and suite[len("buffer_"):] in self.sizes:
-			self.sizes[suite[len("buffer_"):]].append(good)
-		elif suite != "info":
-			self.others.setdefault(suite, []).append(good)
+		self.done.setdefault(name.split("/", 1)[0], []).append(status in ("PASS", "INFO", "WARN"))
 		if paint:
 			self.paint()
 
 	def paint(self):
-		files = len(contents())
-		text = Text()
-		for size, cells in self.sizes.items():
-			if text:
-				text.append("\n")
-			text.append(f"{t('default') if size == 'default' else size:>9} ", style="bold")
-			for good in cells[:files]:
-				text.append("■", style=GOOD if good else BAD)
-			text.append("■" * max(0, files - len(cells)), style=WAITING)
-			if cells:
-				bad = cells.count(False)
-				text.append(f" {len(cells) - bad}/{len(cells)}", style=BAD if bad else "#9ca3af")
-		if self.others:
-			text.append("\n\n" + t("The other tests"), style="bold")
-			for suite, cells in self.others.items():
-				bad = cells.count(False)
-				name = display.suite_name(suite)
-				text.append(f"\n  {name[:26]:26} ", style="#d1d5db")
-				text.append(f"{len(cells) - bad}/{len(cells)}", style=BAD if bad else GOOD)
-		self.update(text)
+		self.update(display.suites_panel(self.rows, self.done))
 
 class RunScreen(Screen):
 	"""A run: the project and the failures as they come, each BUFFER_SIZE drawn, then the report.
@@ -347,7 +327,7 @@ class RunScreen(Screen):
 		yield Static(id="header")
 		with Container(id="body"):
 			yield RichLog(id="log", wrap=True, min_width=0, markup=False, highlight=False)
-			yield SizesPanel(id="sizes")
+			yield SuitesPanel(id="sizes")
 		yield Static(id="activity")
 		yield Static(hints([("r", N_("run again")), ("v", N_("visualize")), ("esc", N_("another folder")),
 			("ctrl+q", N_("quit"))]), id="run-hints")
@@ -374,7 +354,7 @@ class RunScreen(Screen):
 		self.live_failures = False
 		self.refresh_header()
 		self.query_one("#log", RichLog).clear()
-		self.query_one(SizesPanel).reset()
+		self.query_one(SuitesPanel).reset()
 		activity = self.query_one("#activity", Static)
 		activity.set_class(True, "-busy")
 		activity.update("⠿ " + self.progress.text())
@@ -406,9 +386,11 @@ class RunScreen(Screen):
 	def show_event(self, kind, data):
 		self.progress.update(kind, data)
 		log = self.query_one("#log", RichLog)
-		if kind == "check":
+		if kind == "plan":
+			self.query_one(SuitesPanel).plan(data.get("suites") or [])
+		elif kind == "check":
 			if self.live_group is None:
-				log.write(Text(t("The project"), style="bold"))
+				log.write(Text(t("The subject"), style="bold"))
 			if data["group"] != self.live_group:
 				self.live_group = data["group"]
 				log.write(Text("  " + data["group"], style="bold"))
@@ -420,7 +402,7 @@ class RunScreen(Screen):
 				for detail in display.details(data["detail"], indent=14, lines=2):
 					log.write(detail)
 		elif kind == "test":
-			self.query_one(SizesPanel).add(data["name"], data["status"])
+			self.query_one(SuitesPanel).add(data["name"], data["status"])
 			if data["status"] not in ("PASS", "INFO", "WARN"):
 				if not self.live_failures:
 					self.live_failures = True
@@ -445,8 +427,8 @@ class RunScreen(Screen):
 			log.write(line)
 		# Once written: the report opens at its top (the verdict is in the header).
 		self.call_after_refresh(log.scroll_home, animate=False)
-		panel = self.query_one(SizesPanel)
-		panel.reset()
+		panel = self.query_one(SuitesPanel)
+		panel.reset(report.suites or panel.rows)
 		for result in report.results:
 			panel.add(result.name, result.status, paint=False)
 		panel.paint()

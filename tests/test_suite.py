@@ -76,7 +76,7 @@ class TestAGoodFake(SuiteTestCase):
 		results = [event for event in events if isinstance(event, Result)]
 		# The fake calls malloc once a line of few_lines (5), plus nothing for the NULLs.
 		self.assertEqual(len(results), 5)
-		self.assertEqual(fewer, [("fewer", MALLOC_FAILURES - 5)])
+		self.assertEqual(fewer, [("fewer", "malloc_failures", MALLOC_FAILURES - 5)])
 
 	def test_a_fake_that_never_calls_read(self):
 		results = self.results(steps=("read_errors",))

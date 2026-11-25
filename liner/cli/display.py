@@ -10,19 +10,11 @@ from rich.panel import Panel
 from rich.text import Text
 
 from liner.i18n import N_, t
+from liner.names import suite_name
+from liner.report import notes
 
 # The style of each status; any other one (FAIL, CRASH, LEAK...) is a failure.
 STYLES = {"OK": "green", "PASS": "green", "KO": "red", "WARN": "yellow", "SKIP": "dim", "INFO": "cyan"}
-
-# The name of each suite of tests, in the report (buffer_<n> and limits_<n> apart).
-SUITES = {
-	"stdin": N_("standard input"),
-	"fds": N_("file descriptors"),
-	"read_errors": N_("read() fails"),
-	"malloc_failures": N_("malloc() fails"),
-	"read_little": N_("read as little as possible"),
-	"bonus": N_("several fds (bonus)"),
-}
 
 # What the tests are doing, in the counter.
 PHASES = {
@@ -41,15 +33,6 @@ ACCENT = "bold #a5b4fc"
 
 # Said at the bottom of the home screen and at the end of the report.
 DISCLAIMER = N_("A helper tool, not an oracle: it does not cover every test of the evaluation. Test your project yourself too.")
-
-def suite_name(suite):
-	if suite == "buffer_default":
-		return t("BUFFER_SIZE by default")
-	if suite.startswith("buffer_"):
-		return f"BUFFER_SIZE={suite[len('buffer_'):]}"
-	if suite.startswith("limits_"):
-		return t("lines around {size}", size=suite[len("limits_"):])
-	return t(SUITES.get(suite, suite))
 
 def short_path(path):
 	"""`path` with ~ for the home folder."""
@@ -108,8 +91,11 @@ def result_line(result):
 	return [line] + details(result.detail, lines=3)
 
 def suite_lines(suite, results):
-	"""A suite: its score, then its failures and its warnings; one line when they all fail the same way."""
-	counted = [result for result in results if result.status not in ("INFO", "WARN")]
+	"""A suite: its score, then its failures and its warnings; one line when they all fail the same way.
+
+	Counted like 42pal counts: an undefined case (INFO) is not, a warning passes.
+	"""
+	counted = [result for result in results if result.status != "INFO"]
 	bad = [result for result in counted if result.bad]
 	line = leader(suite_name(suite))
 	if not counted:
@@ -123,8 +109,8 @@ def suite_lines(suite, results):
 		same.append_text(status(bad[0].status))
 		same.append(t("all {count}", count=len(bad)))
 		return lines + [same] + details(bad[0].detail, lines=2)
-	# The failures, then the warnings and what is said only (not counted, but to look at).
-	shown = bad + [result for result in results if result.status in ("WARN", "INFO")]
+	# The failures, then the warnings (not counted, but to look at).
+	shown = bad + [result for result in results if result.status == "WARN"]
 	for result in shown[:10]:
 		lines += result_line(result)
 	if len(shown) > 10:
@@ -139,7 +125,7 @@ def report_lines(report, name="linerator"):
 	lines = [head]
 	if report.checks:
 		passed, counted = report.conformity_score
-		section = Text("\n" + t("The project"), style="bold")
+		section = Text("\n" + t("The subject"), style="bold")
 		section.append_text(score(passed, counted))
 		lines.append(section)
 		lines += check_lines(report.checks)
@@ -163,6 +149,7 @@ def report_lines(report, name="linerator"):
 			line = leader(result.name.split("/", 1)[-1])
 			line.append(" " + result.detail, style="cyan")
 			lines.append(line)
+	lines += [Text("! " + note, style="yellow") for note in notes(report)]
 	lines.append(Text())
 	lines.append(verdict(report))
 	lines.append(Text("\n" + t(DISCLAIMER), style="dim italic"))
@@ -173,11 +160,50 @@ def verdict(report):
 	text = Text("✓ OK" if report.passed else "✗ KO", style="bold green" if report.passed else "bold red")
 	scores = []
 	if report.checks:
-		scores.append(t("project {passed}/{total}", passed=report.conformity_score[0], total=report.conformity_score[1]))
+		scores.append(t("subject {passed}/{total}", passed=report.conformity_score[0], total=report.conformity_score[1]))
 	if report.results:
 		scores.append(t("tests {passed}/{total}", passed=report.test_score[0], total=report.test_score[1]))
 	if scores:
 		text.append("  " + " · ".join(scores))
+	return text
+
+# The colors of the cells of the panel.
+GOOD, BAD, WAITING = "#4ade80", "#f87171", "#2a2f3a"
+
+def suites_panel(rows, done, width=44, label_width=22):
+	"""The panel of the suites: a group of rows, each its label, a cell a test (green, red, or waiting), its score.
+
+	rows: names.suite_rows (or the "suites" of the JSON); done: {suite: [True when it passed, ...]}.
+	With more tests than room, a cell stands for several: red when one failed. 42pal draws the same.
+	"""
+	text, group = Text(), None
+	for row in rows:
+		if row["group"] != group:
+			group = row["group"]
+			if text:
+				text.append("\n\n")
+			text.append(group, style="bold")
+			label_room = min(label_width, max(len(other["label"]) for other in rows if other["group"] == group))
+		results = done.get(row["key"], [])
+		label = row["label"] if len(row["label"]) <= label_room else row["label"][:label_room - 1] + "…"
+		text.append("\n " + label.ljust(label_room) + " ", style="#d1d5db")
+		tests = max(row["tests"], len(results), 1)
+		room = max(4, width - label_room - 10)
+		cells = min(tests, room)
+		for cell in range(cells):
+			part = results[cell * tests // cells:(cell + 1) * tests // cells]
+			covered = (cell + 1) * tests // cells - cell * tests // cells
+			if False in part:
+				style = BAD
+			elif part and len(part) == covered:
+				style = GOOD
+			else:
+				style = WAITING
+			text.append("■", style=style)
+		if results:
+			bad = results.count(False)
+			finished = len(results) >= row["tests"]
+			text.append(f" {len(results) - bad}/{len(results)}", style=BAD if bad else GOOD if finished else "#9ca3af")
 	return text
 
 class Progress:
@@ -206,7 +232,7 @@ class Progress:
 
 	def text(self, name="linerator"):
 		if self.step == "subject":
-			return t("{name} · the project: {count} checks", name=name, count=self.checks)
+			return t("{name} · the subject: {count} checks", name=name, count=self.checks)
 		if self.step == "tests":
 			filled = round(24 * self.done / self.total) if self.total else 0
 			bar = "━" * filled + "─" * (24 - filled)

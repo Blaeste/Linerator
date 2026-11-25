@@ -131,7 +131,8 @@ class TestLive(TuiTestCase):
 			on_event("step", {"step": "subject"})
 			on_event("check", {"key": "code.externals", "group": "Code", "label": "Only read, malloc and free",
 				"status": "KO", "detail": "not allowed: lseek"})
-			on_event("plan", {"tests": 4})
+			on_event("plan", {"tests": 4, "suites": [{"key": "buffer_1", "name": "BUFFER_SIZE=1", "group": "BUFFER_SIZE",
+				"label": "1", "tests": 4}]})
 			on_event("step", {"step": "tests"})
 			on_event("phase", {"phase": "lines"})
 			on_event("test", {"name": "buffer_1/few_lines", "status": "PASS", "detail": "5 lines", "ms": 1})
@@ -195,6 +196,36 @@ class TestTheVisualizer(TuiTestCase):
 			await pilot.press("escape")
 			await pilot.pause()
 		self.assertFalse(app.is_running)
+
+class TestThePanel(unittest.TestCase):
+	"""The panel of the suites: a row a suite, a cell a test; 42pal draws the same from the JSON."""
+
+	def styles(self, text):
+		return [str(span.style) for span in text.spans if text.plain[span.start:span.end] == "■" * (span.end - span.start)]
+
+	def test_a_cell_a_test(self):
+		from liner.cli.display import BAD, GOOD, WAITING, suites_panel
+		rows = [{"key": "buffer_1", "name": "BUFFER_SIZE=1", "group": "BUFFER_SIZE", "label": "1", "tests": 4}]
+		text = suites_panel(rows, {"buffer_1": [True, False]})
+		self.assertEqual(text.plain, "BUFFER_SIZE\n 1 ■■■■ 1/2")
+		self.assertEqual(self.styles(text), [GOOD, BAD, WAITING, WAITING])
+
+	def test_more_tests_than_room_and_a_long_label(self):
+		from liner.cli.display import suites_panel
+		rows = [{"key": "a", "name": "a", "group": "The other tests", "label": "read as little as possible, really",
+			"tests": 100}]
+		text = suites_panel(rows, {"a": [True] * 100}, width=44)
+		line = text.plain.splitlines()[1]
+		self.assertLessEqual(len(line), 44)
+		self.assertIn("…", line)
+		self.assertTrue(line.endswith("100/100"))
+
+	def test_the_groups(self):
+		from liner.names import suite_rows
+		from liner.cli.display import suites_panel
+		text = suites_panel(suite_rows([("buffer_1", 16), ("buffer_default", 16), ("stdin", 6), ("info", 2)]), {})
+		self.assertEqual([line.strip()[:12] for line in text.plain.splitlines() if line.strip()],
+			["BUFFER_SIZE", "1       ■■■■", "default ■■■■", "The other te", "standard inp"])
 
 class TestTheReport(unittest.TestCase):
 

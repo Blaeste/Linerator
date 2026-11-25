@@ -2,9 +2,9 @@
 
 test_project gives a Report. on_event(kind, data), when given, is called
 as things happen, with the events of --stream: start, step (subject: the
-project; tests), check, plan (the number of runs to come; it may come
-again, smaller), phase (lines, limits... : what the tests are doing),
-test, error.
+project; tests), check, plan (the number of runs to come and the rows of
+the panel; it may come again, smaller), phase (lines, limits... : what the
+tests are doing), test, error.
 """
 
 from dataclasses import dataclass, field
@@ -14,8 +14,9 @@ from liner import __version__
 from liner.build import Builder
 from liner.i18n import language, t
 from liner.judge import Result
+from liner.names import suite_rows
 from liner.project import Workspace, check_project
-from liner.suite import planned, run_suite
+from liner.suite import plan, run_suite
 
 @dataclass
 class Report:
@@ -27,6 +28,8 @@ class Report:
 	seed: int = 42
 	# The copy where the tests were built, kept for the visualizer (keep=True).
 	workspace: object = None
+	# The rows of the panel: a row a suite (names.suite_rows).
+	suites: list = field(default_factory=list)
 
 	@property
 	def conformity_score(self):
@@ -35,7 +38,8 @@ class Report:
 
 	@property
 	def test_score(self):
-		counted = [result for result in self.results if result.status not in ("INFO", "WARN")]
+		"""The tests passed out of those counted: an undefined case (INFO) is not; a warning passes."""
+		counted = [result for result in self.results if result.status != "INFO"]
 		return sum(not result.bad for result in counted), len(counted)
 
 	@property
@@ -66,8 +70,9 @@ def test_project(source, seed=42, timeout=10, norminette="norminette", steps=Non
 			return _fail(report, emit, t("get_next_line does not compile: the tests cannot run."), build.detail)
 		builder = Builder(workspace.path, workspace.root / "build")
 		bonus = Builder(workspace.path, workspace.root / "build", bonus=True) if project.bonus else None
-		total = planned(steps, bonus is not None)
-		emit("plan", {"tests": total})
+		suites = plan(steps, bonus is not None)
+		report.suites = suite_rows(suites)
+		emit("plan", plan_dict(suites))
 		emit("step", {"step": "tests"})
 		for event in run_suite(builder, workspace.root / "run", bonus, seed=seed, timeout=timeout, steps=steps,
 				workers=workers):
@@ -75,8 +80,9 @@ def test_project(source, seed=42, timeout=10, norminette="norminette", steps=Non
 				report.results.append(event)
 				emit("test", test_dict(event))
 			elif event[0] == "fewer":
-				total -= event[1]
-				emit("plan", {"tests": total})
+				suites = [(key, count - event[2] if key == event[1] else count) for key, count in suites]
+				report.suites = suite_rows(suites)
+				emit("plan", plan_dict(suites))
 			else:
 				emit("phase", {"phase": event[1]})
 		return report
@@ -94,6 +100,10 @@ def _fail(report, emit, title, detail):
 def check_dict(check):
 	return {"key": check.key, "group": check.group, "label": check.label, "status": check.status,
 		"detail": check.detail}
+
+def plan_dict(suites):
+	"""The plan event: the number of tests to come, and the rows of the panel."""
+	return {"tests": sum(count for _, count in suites), "suites": suite_rows(suites)}
 
 def test_dict(result):
 	return {"name": result.name, "status": result.status, "detail": result.detail, "ms": result.ms}

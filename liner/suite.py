@@ -2,9 +2,9 @@
 
 run_suite gives, in order: ("step", name) when a step starts, then a
 Result for each run. The runs of a step go in parallel; their results come
-in the order of the cases. planned() says how many results there will be at
-most: ("fewer", n) says n of them will not come (malloc is made to fail
-only as many times as get_next_line calls it).
+in the order of the cases. plan() says how many results each suite will
+give at most: ("fewer", suite, n) says n of them will not come (malloc is
+made to fail only as many times as get_next_line calls it).
 """
 
 import os
@@ -35,13 +35,23 @@ def label(buffer_size):
 def steps_to_run(steps, bonus):
 	return [step for step in STEPS if (steps is None or step in steps) and (step != "bonus" or bonus)]
 
+def plan(steps, bonus):
+	"""[(suite, results)] the steps will give, in order (malloc_failures at most)."""
+	sizes = {"stdin": len(STDIN_FILES) + 1, "fds": 3, "read_errors": 3 + len(REOPEN_SIZES),
+		"malloc_failures": MALLOC_FAILURES, "read_little": len(READ_LITTLE_SIZES), "bonus": len(BONUS_SETS), "info": 2}
+	found = []
+	for step in steps_to_run(steps, bonus):
+		if step == "lines":
+			found += [(f"buffer_{label(size)}", len(contents())) for size in BUFFER_SIZES]
+		elif step == "limits":
+			found += [(f"limits_{size}", len(limit_contents(size))) for size in LIMIT_SIZES]
+		else:
+			found.append((step, sizes[step]))
+	return found
+
 def planned(steps, bonus):
 	"""How many results the steps will give."""
-	counts = {"lines": len(BUFFER_SIZES) * len(contents()), "limits": len(LIMIT_SIZES) * len(limit_contents(10)),
-		"stdin": len(STDIN_FILES) + 1, "fds": 3, "read_errors": 3 + len(REOPEN_SIZES),
-		"malloc_failures": MALLOC_FAILURES, "read_little": len(READ_LITTLE_SIZES),
-		"bonus": len(BONUS_SETS), "info": 2}
-	return sum(counts[step] for step in steps_to_run(steps, bonus))
+	return sum(count for _, count in plan(steps, bonus))
 
 def limit_contents(size):
 	"""{name: bytes}: lines of size - 1 to 2 × size + 1, with or without their newline, and pairs."""
@@ -166,7 +176,7 @@ def run_suite(builder, folder, bonus_builder=None, seed=42, timeout=10, steps=No
 			yield ("step", step)
 			found = list(cases(step))
 			if step == "malloc_failures" and len(found) < MALLOC_FAILURES:
-				yield ("fewer", MALLOC_FAILURES - len(found))
+				yield ("fewer", "malloc_failures", MALLOC_FAILURES - len(found))
 			yield from pool.map(lambda case: case(), found)
 
 def judge_all(builder, folder, **options):
