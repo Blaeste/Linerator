@@ -57,8 +57,13 @@ char	*get_next_line(int fd)
 #if FAKE_MODE == 7
 	char	probe;
 
-	if (fd >= 0 && read(fd, &probe, 0) < 0)
+	if (fd >= 0 && fd < 1024 && read(fd, &probe, 0) < 0)
+	{
+		if (files[fd])
+			fclose(files[fd]);
+		files[fd] = NULL;
 		return (NULL);
+	}
 #endif
 	if (fd < 0 || fd >= 1024)
 		return (NULL);

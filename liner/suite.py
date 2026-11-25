@@ -10,14 +10,17 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from liner.files import BIG_FIRST_LINE, big, contents, lines_of, write_files
+from liner.files import BIG_FIRST_LINE, READ_ERROR, big, contents, lines_of, write_files
 from liner.i18n import language, t
 from liner.judge import (Result, judge_closed, judge_info, judge_lines, judge_malloc_failure, judge_multi,
-	judge_null, judge_read_error, judge_read_little)
+	judge_null, judge_read_error, judge_read_little, judge_reopen)
 from liner.run import run_program
 
 BUFFER_SIZES = (1, 2, 3, 5, 10, 42, 100, 1000, 9999, 10000000, None)
-STEPS = ("lines", "stdin", "fds", "read_errors", "malloc_failures", "read_little", "bonus", "info")
+STEPS = ("lines", "limits", "stdin", "fds", "read_errors", "malloc_failures", "read_little", "bonus", "info")
+# Lines around BUFFER_SIZE (from the testers of francinette, fsoares, MIT; and the files 41, 42, 43 of gnlTester).
+LIMIT_SIZES = (10, 42)
+REOPEN_SIZES = (1, 42, 1000)
 STDIN_FILES = ("few_lines", "last_line_no_newline", "empty", "long_line", "many_lines")
 MALLOC_FAILURES = 20
 READ_LITTLE_SIZES = (1, 42, 1000)
@@ -31,10 +34,21 @@ def steps_to_run(steps, bonus):
 
 def planned(steps, bonus):
 	"""How many results the steps will give."""
-	counts = {"lines": len(BUFFER_SIZES) * len(contents()), "stdin": len(STDIN_FILES) + 1, "fds": 3,
-		"read_errors": 3, "malloc_failures": MALLOC_FAILURES, "read_little": len(READ_LITTLE_SIZES),
+	counts = {"lines": len(BUFFER_SIZES) * len(contents()), "limits": len(LIMIT_SIZES) * len(limit_contents(10)),
+		"stdin": len(STDIN_FILES) + 1, "fds": 3, "read_errors": 3 + len(REOPEN_SIZES),
+		"malloc_failures": MALLOC_FAILURES, "read_little": len(READ_LITTLE_SIZES),
 		"bonus": len(BONUS_SETS), "info": 2}
 	return sum(counts[step] for step in steps_to_run(steps, bonus))
+
+def limit_contents(size):
+	"""{name: bytes}: lines of size - 1 to 2 × size + 1, with or without their newline, and pairs."""
+	patterns = [(length,) for length in (size - 1, size, size + 1, 2 * size - 1, 2 * size, 2 * size + 1)]
+	patterns = [pattern + nl for pattern in patterns for nl in ((), ("nl",))]
+	patterns += [(size - 1, "nl", size - 1, "nl"), (size - 1, "nl", size), (size - 1, "nl", size, "nl"),
+		(size, "nl", size - 2, "nl"), (size, "nl", size - 1), (size, "nl", size - 1, "nl")]
+	digits = b"0123456789" * (2 * size // 10 + 2)
+	return {"_".join(map(str, pattern)): b"".join(b"\n" if part == "nl" else digits[:part] for part in pattern)
+		for pattern in patterns}
 
 class Programs:
 	"""The test program for each BUFFER_SIZE, built once (or why it cannot be)."""
@@ -57,7 +71,7 @@ class Programs:
 def run_suite(builder, folder, bonus_builder=None, seed=42, timeout=10, steps=None, workers=None):
 	"""Run the steps with the programs of `builder` (and `bonus_builder` for the bonus)."""
 	paths = write_files(Path(folder) / "files", seed)
-	data = {**contents(seed), "big": big()}
+	data = {**contents(seed), "big": big(), "read_error": READ_ERROR}
 	expected = {name: lines_of(content) for name, content in data.items()}
 	programs, bonus_programs = Programs(builder), Programs(bonus_builder) if bonus_builder else None
 	lang = ["--lang", "fr"] if language() == "fr" else []
@@ -77,6 +91,16 @@ def run_suite(builder, folder, bonus_builder=None, seed=42, timeout=10, steps=No
 					yield lambda size=size, file=file: run(f"buffer_{label(size)}/{file}", size, ["lines", str(paths[file])],
 						lambda r, file=file, size=size: judge_lines(f"buffer_{label(size)}/{file}", r, expected[file],
 						timeout, size))
+		elif step == "limits":
+			for size in LIMIT_SIZES:
+				folder_ = Path(folder) / "files" / f"limits_{size}"
+				folder_.mkdir(parents=True, exist_ok=True)
+				for file, content in limit_contents(size).items():
+					path = folder_ / f"{file}.txt"
+					path.write_bytes(content)
+					name = f"limits_{size}/{file}"
+					yield lambda size=size, path=path, name=name, content=content: run(name, size, ["lines", str(path)],
+						lambda r: judge_lines(name, r, lines_of(content), timeout, size))
 		elif step == "stdin":
 			for size, file in [(42, file) for file in STDIN_FILES] + [(1, "few_lines")]:
 				name = f"stdin/{file}" + ("_buffer_1" if size == 1 else "")
@@ -93,6 +117,10 @@ def run_suite(builder, folder, bonus_builder=None, seed=42, timeout=10, steps=No
 				yield lambda name=name, size=size, call=call, file=file: run(f"read_errors/{name}", size,
 					["--fail-read", str(call), "lines", str(paths[file])],
 					lambda r: judge_read_error(f"read_errors/{name}", r, expected[file], timeout))
+			for size in REOPEN_SIZES:
+				name = f"read_errors/error_then_reopen_buffer_{size}"
+				yield lambda size=size, name=name: run(name, size, ["reopen", str(paths["read_error"])],
+					lambda r: judge_reopen(name, r, lines_of(data["read_error"]), timeout))
 		elif step == "malloc_failures":
 			for call in range(1, MALLOC_FAILURES + 1):
 				yield lambda call=call: run(f"malloc_failures/malloc_{call}", 42,

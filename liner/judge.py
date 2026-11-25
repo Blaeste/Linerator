@@ -166,6 +166,21 @@ def judge_read_error(name, run, expected, timeout=10):
 		return Result(name, "FAIL", t("read() returned -1, but get_next_line returned {line}", line=shown(after)), run.ms)
 	return Result(name, "PASS", t("NULL when read() fails, nothing left allocated"), run.ms)
 
+def judge_reopen(name, run, expected, timeout=10):
+	"""Two lines, NULL once read() fails, then the file opened again read from its start."""
+	result, out = problem(name, run, timeout)
+	if result:
+		return result
+	before = [line for line, file in zip(out.results, out.files) if file == 0]
+	after = [line for line, file in zip(out.results, out.files) if file == 1]
+	if before[:2] != expected[:2]:
+		return Result(name, "FAIL", compare(before[:2], expected) or t("wrong lines"), run.ms)
+	difference = compare(after, expected + [None])
+	if difference:
+		return Result(name, "FAIL", t("opened again after a failed read(): {difference} (the static is not cleared?)",
+			difference=difference), run.ms)
+	return Result(name, "PASS", t("the static cleared when read() fails"), run.ms)
+
 def judge_malloc_failure(name, run, expected, call, timeout=10):
 	"""The malloc number `call` made to fail: no crash, no leak, and the lines returned before the NULL right."""
 	result, out = problem(name, run, timeout)

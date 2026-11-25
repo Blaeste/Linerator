@@ -49,7 +49,8 @@ class TestTheParts(unittest.TestCase):
 			[(0, b"a\n"), (1, b"c\n"), (0, b"b\n"), (1, None), (0, None)])
 
 	def test_the_plan(self):
-		self.assertEqual(planned(["lines"], False), 11 * 14)
+		self.assertEqual(planned(["lines"], False), 11 * 16)
+		self.assertEqual(planned(["limits"], False), 2 * 18)
 		self.assertGreater(planned(None, True), planned(None, False))
 
 class TestAGoodFake(SuiteTestCase):
@@ -79,6 +80,29 @@ class TestAGoodFake(SuiteTestCase):
 	def test_the_undefined_cases(self):
 		results = self.results(steps=("info",))
 		self.assertEqual(self.statuses(results, "info"), {"INFO"})
+
+class TestTheCasesOfOtherTesters(SuiteTestCase):
+	"""Cases from the testers of francinette (fsoares, MIT) and ideas from gnlTester."""
+
+	def test_the_limits_around_buffer_size(self):
+		from liner.suite import limit_contents
+		files = limit_contents(10)
+		self.assertEqual(files["9"], b"012345678")
+		self.assertEqual(files["10_nl_9"], b"0123456789\n012345678")
+		self.assertEqual(len(files), 18)
+		results = self.results(steps=("limits",))
+		self.assertIn("limits_42/41_nl", results)
+		self.assertEqual(self.statuses(results, "limits_10"), {"PASS"})
+		self.assertEqual(self.statuses(results, "limits_42"), {"PASS"})
+
+	def test_a_read_error_then_the_file_opened_again(self):
+		results = self.results("sees_read_errors", steps=("read_errors",))
+		self.assertEqual(results["read_errors/error_then_reopen_buffer_42"].status, "PASS")
+
+	def test_the_new_files(self):
+		from liner.files import contents
+		self.assertEqual(contents()["one_char"], b"0")
+		self.assertIn(b"\n\n", contents()["alternating_empty_lines"])
 
 class TestBrokenFakes(SuiteTestCase):
 

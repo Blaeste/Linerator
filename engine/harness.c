@@ -5,6 +5,8 @@
 **   harness [options] closed PATH     one line, then the fd is closed, then a call
 **   harness [options] multi PATH...   the files in turn (the bonus), up to NULL for all
 **   harness [options] trace PATH      like lines, with each read() (for the visualizer)
+**   harness [options] reopen PATH     two lines, then every read() fails up to NULL; the file
+**                                     is closed, opened again (the same fd), and read again
 **   harness [options] first PATH      the first line only, then the counts (no leak check:
 **                                     what is left to read stays in the static)
 **
@@ -42,13 +44,14 @@ static size_t	g_read_bytes;
 static size_t	g_first_bytes;
 static int		g_first_seen;
 static int		g_trace;
+static int		g_read_fail_all;
 
 ssize_t	__wrap_read(int fd, void *buf, size_t n)
 {
 	ssize_t	ret;
 
 	g_read_calls++;
-	if (g_read_fail_at != 0 && g_read_calls == g_read_fail_at)
+	if (g_read_fail_all || (g_read_fail_at != 0 && g_read_calls == g_read_fail_at))
 	{
 		printf("X\n");
 		errno = EIO;
@@ -150,6 +153,28 @@ static void	read_closed(const char *path)
 	show(get_next_line(fd));
 }
 
+/* From the testers of francinette (fsoares, MIT): after a failed read(), the
+** static must be cleared, so that the file opened again is read from its start. */
+static void	read_reopen(const char *path)
+{
+	int	fd;
+
+	fd = open_path(path);
+	printf("F 0\n");
+	show(get_next_line(fd));
+	show(get_next_line(fd));
+	g_read_fail_all = 1;
+	while (show(get_next_line(fd)))
+		;
+	g_read_fail_all = 0;
+	close(fd);
+	fd = open_path(path);
+	printf("F 1\n");
+	while (show(get_next_line(fd)))
+		;
+	close(fd);
+}
+
 static void	read_multi(int count, char **paths)
 {
 	int	fds[64];
@@ -185,7 +210,7 @@ static void	read_multi(int count, char **paths)
 static void	usage(void)
 {
 	fprintf(stderr, "usage: harness [--fail-malloc K] [--fail-read K] [--lang fr] "
-		"lines PATH | fd N | closed PATH | multi PATH... | trace PATH | first PATH\n");
+		"lines PATH | fd N | closed PATH | reopen PATH | multi PATH... | trace PATH | first PATH\n");
 	exit(2);
 }
 
@@ -222,6 +247,8 @@ int	main(int argc, char **argv)
 	}
 	else if (strcmp(argv[i], "closed") == 0)
 		read_closed(argv[i + 1]);
+	else if (strcmp(argv[i], "reopen") == 0)
+		read_reopen(argv[i + 1]);
 	else if (strcmp(argv[i], "multi") == 0)
 		read_multi(argc - i - 1, argv + i + 1);
 	else if (strcmp(argv[i], "first") == 0)

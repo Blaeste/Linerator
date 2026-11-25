@@ -25,6 +25,8 @@ def contents(seed=42):
 		"last_line_no_newline": b"first\nsecond\nthird",
 		"empty_lines_between": b"a\n\n\nb\n\n",
 		"one_char_lines": b"a\nb\nc\nd\ne\n",
+		"one_char": b"0",
+		"alternating_empty_lines": b"line 1\n\nline 3\n\nline 5\n\n",
 		"lines_around_42": around,
 		"long_line": b"x" * LONG + b"\nend\n",
 		"long_line_no_newline": b"y" * LONG,
@@ -34,6 +36,9 @@ def contents(seed=42):
 
 # The file the reads are counted on: a short first line, then a lot.
 BIG_FIRST_LINE = b"first line\n"
+
+# The file of the read error, then opened again (from the testers of francinette, fsoares, MIT).
+READ_ERROR = b"aaaaaaaaaa\nbbbbbbbbbb\ncccccccccc\ndddddddddd\n"
 
 # The file closed between two calls: its second line is too long to be read already.
 CLOSED = b"one\n" + b"x" * 1000 + b"\nend\n"
@@ -54,7 +59,7 @@ def write_files(folder, seed=42):
 	folder = Path(folder)
 	folder.mkdir(parents=True, exist_ok=True)
 	paths = {}
-	for name, data in {**contents(seed), "big": big(), "closed": CLOSED}.items():
+	for name, data in {**contents(seed), "big": big(), "closed": CLOSED, "read_error": READ_ERROR}.items():
 		path = folder / f"{name}.txt"
 		path.write_bytes(data)
 		paths[name] = path
