@@ -103,7 +103,7 @@ def check_project(workspace, norminette="norminette", on_check=None):
 		detail = t("missing: {files}", files=", ".join(missing))
 		if elsewhere:
 			detail += " · " + t("found in a folder: {files}", files=", ".join(elsewhere))
-	result.add("files.mandatory", files, t("get_next_line.c, get_next_line_utils.c, get_next_line.h at the root"),
+	result.add("files.mandatory", files, t("The 3 files of the subject at the root"),
 		KO if missing else OK, detail)
 	_header(workspace, result, "get_next_line.h", "header.prototype", files)
 	sources = [name for name in MANDATORY if name.endswith(".c") and workspace.has(name)]
@@ -233,7 +233,7 @@ def _externals(objects, result, key, group):
 
 def _bonus(workspace, result):
 	group = t("Bonus")
-	label = t("get_next_line_bonus.c, get_next_line_utils_bonus.c, get_next_line_bonus.h at the root")
+	label = t("The 3 bonus files at the root")
 	present = [name for name in BONUS if workspace.has(name)]
 	if not present:
 		result.add("files.bonus", group, label, SKIP, t("no bonus file"))
