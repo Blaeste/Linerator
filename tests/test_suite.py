@@ -7,7 +7,7 @@ from pathlib import Path
 from liner.build import Builder
 from liner.files import lines_of
 from liner.judge import Result, interleave, parse
-from liner.suite import judge_all, planned
+from liner.suite import MALLOC_FAILURES, judge_all, planned, run_suite
 from tests.fakes import make_project
 
 class SuiteTestCase(unittest.TestCase):
@@ -65,8 +65,18 @@ class TestAGoodFake(SuiteTestCase):
 	def test_malloc_failures_and_reading_little(self):
 		results = self.results(steps=("malloc_failures", "read_little"))
 		self.assertEqual(self.statuses(results, "read_little"), {"PASS"})
-		self.assertTrue(self.statuses(results, "malloc_failures") <= {"PASS", "INFO"})
+		self.assertEqual(self.statuses(results, "malloc_failures"), {"PASS"})
 		self.assertEqual(results["malloc_failures/malloc_1"].status, "PASS")
+
+	def test_malloc_made_to_fail_as_many_times_as_it_is_called(self):
+		project = make_project(self.folder / "count", "good")
+		builder = Builder(project, self.folder / "count" / "build")
+		events = list(run_suite(builder, self.folder / "count" / "run", steps=("malloc_failures",)))
+		fewer = [event for event in events if isinstance(event, tuple) and event[0] == "fewer"]
+		results = [event for event in events if isinstance(event, Result)]
+		# The fake calls malloc once a line of few_lines (5), plus nothing for the NULLs.
+		self.assertEqual(len(results), 5)
+		self.assertEqual(fewer, [("fewer", MALLOC_FAILURES - 5)])
 
 	def test_a_fake_that_never_calls_read(self):
 		results = self.results(steps=("read_errors",))

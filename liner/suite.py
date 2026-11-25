@@ -2,7 +2,9 @@
 
 run_suite gives, in order: ("step", name) when a step starts, then a
 Result for each run. The runs of a step go in parallel; their results come
-in the order of the cases. planned() says how many results there will be.
+in the order of the cases. planned() says how many results there will be at
+most: ("fewer", n) says n of them will not come (malloc is made to fail
+only as many times as get_next_line calls it).
 """
 
 import os
@@ -13,7 +15,7 @@ from pathlib import Path
 from liner.files import BIG_FIRST_LINE, READ_ERROR, big, contents, lines_of, write_files
 from liner.i18n import language, t
 from liner.judge import (Result, judge_closed, judge_info, judge_lines, judge_malloc_failure, judge_multi,
-	judge_null, judge_read_error, judge_read_little, judge_reopen)
+	judge_null, judge_read_error, judge_read_little, judge_reopen, parse)
 from liner.run import run_program
 
 BUFFER_SIZES = (1, 2, 3, 5, 10, 42, 100, 1000, 9999, 10000000, None)
@@ -22,6 +24,7 @@ STEPS = ("lines", "limits", "stdin", "fds", "read_errors", "malloc_failures", "r
 LIMIT_SIZES = (10, 42)
 REOPEN_SIZES = (1, 42, 1000)
 STDIN_FILES = ("few_lines", "last_line_no_newline", "empty", "long_line", "many_lines")
+# The calls to malloc made to fail, each in its own run, at most.
 MALLOC_FAILURES = 20
 READ_LITTLE_SIZES = (1, 42, 1000)
 BONUS_SETS = ((42, ("few_lines", "last_line_no_newline", "many_lines")), (1, ("one_line", "empty", "long_line")))
@@ -84,6 +87,14 @@ def run_suite(builder, folder, bonus_builder=None, seed=42, timeout=10, steps=No
 				error=error.splitlines()[-1] if error else ""))
 		return judge(run_program(program, [*lang, *args], stdin=stdin, timeout=timeout))
 
+	def malloc_calls():
+		"""How many times malloc is made to fail: the calls of a run without failure, MALLOC_FAILURES at most."""
+		program, _ = programs.get(42)
+		if program is None:
+			return MALLOC_FAILURES
+		out = parse(run_program(program, [*lang, "lines", str(paths["few_lines"])], timeout=timeout).stdout)
+		return max(1, min(MALLOC_FAILURES, out.stats.get("mallocs", MALLOC_FAILURES)))
+
 	def cases(step):
 		if step == "lines":
 			for size in BUFFER_SIZES:
@@ -122,7 +133,7 @@ def run_suite(builder, folder, bonus_builder=None, seed=42, timeout=10, steps=No
 				yield lambda size=size, name=name: run(name, size, ["reopen", str(paths["read_error"])],
 					lambda r: judge_reopen(name, r, lines_of(data["read_error"]), timeout))
 		elif step == "malloc_failures":
-			for call in range(1, MALLOC_FAILURES + 1):
+			for call in range(1, malloc_calls() + 1):
 				yield lambda call=call: run(f"malloc_failures/malloc_{call}", 42,
 					["--fail-malloc", str(call), "lines", str(paths["few_lines"])],
 					lambda r: judge_malloc_failure(f"malloc_failures/malloc_{call}", r, expected["few_lines"], call,
@@ -153,7 +164,10 @@ def run_suite(builder, folder, bonus_builder=None, seed=42, timeout=10, steps=No
 	with ThreadPoolExecutor(max_workers=workers) as pool:
 		for step in steps_to_run(steps, bonus_builder is not None):
 			yield ("step", step)
-			yield from pool.map(lambda case: case(), list(cases(step)))
+			found = list(cases(step))
+			if step == "malloc_failures" and len(found) < MALLOC_FAILURES:
+				yield ("fewer", MALLOC_FAILURES - len(found))
+			yield from pool.map(lambda case: case(), found)
 
 def judge_all(builder, folder, **options):
 	"""The results only, in a list."""
