@@ -41,4 +41,8 @@ Chaque étape en TDD, puis les tests utilisateur.
 6. **Le moteur complet, le rapport, JSON, stream.**
 7. **Le plein écran** (accueil, run en direct, panneau des BUFFER_SIZE, rapport).
 8. **Le visualiseur des lectures.**
-9. **Français, README, captures.** 10. **Dans 42pal.**
+9. **Français, README, captures.**
+10. **Dans 42pal** : une fois Linerator testé par l'utilisateur, le dépôt `Blaeste/Linerator` créé et le tag poussé (avec son accord).
+
+État au 2026-11-25 : étapes 1 à 9 faites (72 tests, Python 3.10 et 3.13) ; la vraie copie de gnl passe 247/247.
+
