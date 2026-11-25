@@ -150,6 +150,8 @@ class TestLive(TuiTestCase):
 			text = log_text(screen)
 			self.assertIn("not allowed: lseek", text)
 			self.assertIn("1 block left", text)
+			# The failure live with the name of its suite, like 42pal shows it.
+			self.assertIn("BUFFER_SIZE=1 · long_line", text)
 			self.assertIn("1/2", rendered(screen.query_one("#sizes")))
 			self.assertTrue(screen.busy)
 			release.set()

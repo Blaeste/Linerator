@@ -25,6 +25,7 @@ from liner.cli.display import Progress, report_lines, short_path
 from liner.engine import test_project
 from liner.find import iter_projects, last_project, looks_like_project, remember_project
 from liner.i18n import N_, t
+from liner.names import suite_name
 
 LETTERS = [
 	"██╗  ██╗██████╗ ██████╗  █████╗ ██╗     ",
@@ -407,9 +408,10 @@ class RunScreen(Screen):
 				if not self.live_failures:
 					self.live_failures = True
 					log.write(Text("\n" + t("Failed so far"), style="bold"))
+				suite, _, short = data["name"].partition("/")
 				line = Text("    ")
 				line.append_text(display.status(data["status"]))
-				line.append(data["name"])
+				line.append(f"{suite_name(suite)} · {short}" if short else data["name"])
 				log.write(line)
 				for detail in display.details(data["detail"], lines=1):
 					log.write(detail)
