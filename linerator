@@ -1,0 +1,13 @@
+#!/bin/sh
+# Launcher for Linerator: runs the liner package with the system python3.
+# Nothing to install: the libraries of the interface are in vendor/.
+
+# The folder of this script, even through a symlink (like ~/bin/linerator).
+ROOT=$(dirname -- "$(readlink -f -- "$0")")
+
+# That folder first in PYTHONPATH: python3 finds the package from any folder,
+# and the program keeps running in the folder of the student.
+PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH
+
+exec python3 -m liner "$@"

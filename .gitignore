@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+
+# The subjects of 42 never go in the repository
+*subject*.pdf
+
+# A complete reference get_next_line must never be published: local fixtures only
+selftest/
