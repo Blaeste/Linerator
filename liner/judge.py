@@ -82,7 +82,7 @@ def shown(line, length=40):
 	if line is None:
 		return "NULL"
 	text = line.decode("utf-8", "replace").replace("\n", "⏎")
-	return repr(text if len(text) <= length else text[:length] + f"… ({len(line)} bytes)")
+	return repr(text if len(text) <= length else text[:length] + "… (" + t("{count} bytes", count=len(line)) + ")")
 
 ENDS = {"L": "LEAK", "M": "MEMERR", "O": "OOB", "X": "INTERNAL", "C": "CRASH", "F": "FAIL"}
 

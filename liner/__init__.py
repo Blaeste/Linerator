@@ -5,4 +5,4 @@ never prints: it builds the test program with the files of the student,
 runs it, and says what it found. liner/cli/ shows it.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"

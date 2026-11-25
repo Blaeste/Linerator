@@ -42,5 +42,14 @@ class TestFrench(unittest.TestCase):
 		"""t(text, **fields): a field called text would clash with it."""
 		self.assertEqual([text for text in texts() if "text" in fields(text)], [])
 
+class TestLongLines(unittest.TestCase):
+
+	def test_the_size_of_a_line_cut_in_french(self):
+		from liner import i18n
+		from liner.judge import shown
+		self.addCleanup(i18n.set_language, "en")
+		i18n.set_language("fr")
+		self.assertIn("(50 octets)", shown(b"x" * 50))
+
 if __name__ == "__main__":
 	unittest.main()
