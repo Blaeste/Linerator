@@ -5,6 +5,8 @@
 **   harness [options] closed PATH     one line, then the fd is closed, then a call
 **   harness [options] multi PATH...   the files in turn (the bonus), up to NULL for all
 **   harness [options] trace PATH      like lines, with each read() (for the visualizer)
+**   harness [options] first PATH      the first line only, then the counts (no leak check:
+**                                     what is left to read stays in the static)
 **
 ** Options: --fail-malloc K (the malloc number K returns NULL), --fail-read K
 ** (the read number K returns -1), --lang fr.
@@ -183,7 +185,7 @@ static void	read_multi(int count, char **paths)
 static void	usage(void)
 {
 	fprintf(stderr, "usage: harness [--fail-malloc K] [--fail-read K] [--lang fr] "
-		"lines PATH | fd N | closed PATH | multi PATH... | trace PATH\n");
+		"lines PATH | fd N | closed PATH | multi PATH... | trace PATH | first PATH\n");
 	exit(2);
 }
 
@@ -222,6 +224,13 @@ int	main(int argc, char **argv)
 		read_closed(argv[i + 1]);
 	else if (strcmp(argv[i], "multi") == 0)
 		read_multi(argc - i - 1, argv + i + 1);
+	else if (strcmp(argv[i], "first") == 0)
+	{
+		show(get_next_line(open_path(argv[i + 1])));
+		stats();
+		printf("!P\n");
+		return (0);
+	}
 	else
 		usage();
 	stats();

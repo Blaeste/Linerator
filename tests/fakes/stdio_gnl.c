@@ -4,6 +4,7 @@
 **   0 good   1 leaks   2 no terminator   3 no newline   4 crash on a long line
 **   5 a buffer of BUFFER_SIZE on the stack   6 reads the whole file first
 **   7 sees a failed read()                   8 one static too many */
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,6 +62,14 @@ char	*get_next_line(int fd)
 #endif
 	if (fd < 0 || fd >= 1024)
 		return (NULL);
+	/* A closed fd: NULL, and what was kept for it is dropped. */
+	if (fcntl(fd, F_GETFD) < 0)
+	{
+		if (files[fd])
+			fclose(files[fd]);
+		files[fd] = NULL;
+		return (NULL);
+	}
 #if FAKE_MODE == 6
 	if (files[fd] == NULL)
 	{
