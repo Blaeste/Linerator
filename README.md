@@ -44,8 +44,8 @@ completes.
   <img src="docs/images/run.png" alt="A run: the tests by BUFFER_SIZE and by step, and a cell a test for each BUFFER_SIZE" width="760">
 </p>
 
-During the run, the checks and the failures show as they come. On the side, each `BUFFER_SIZE` fills up
-with a cell a test, green or red. Then the whole report. `r` runs again, `v` opens the visualizer, Esc
+During the run, the checks and the failures show as they come. On the side, each `BUFFER_SIZE`, then
+each other step, fills up with a cell a test, green or red. Then the whole report. `r` runs again, `v` opens the visualizer, Esc
 chooses another folder.
 
 Your project is never touched: Linerator copies it (without the `.o` and `.a` files) and tests the copy.
@@ -119,8 +119,11 @@ The exit code is `0` when everything passes, `1` when something fails, `2` for a
 `--json` and `--stream` follow the contract of [libfterator](https://github.com/Blaeste/Libfterator), so
 that 42pal can run Linerator from its Testers menu. The JSON has `"format": 1`, the checks of the project in
 `conformity`, each run in `tests`, the `BUFFER_SIZE` that fail in `notes`, and `error` when the tests could
-not run. `--stream` gives `start`, `step` (`subject`, then `tests`), `check`, `plan` (it may come again,
-smaller), `phase`, `test` and `error`.
+not run. `suites` gives each suite its name in the language chosen and its row in the panel
+(`{"key": "buffer_1", "name": "BUFFER_SIZE=1", "group": "BUFFER_SIZE", "label": "1", "tests": 16}`), so that
+42pal shows the same names and the same panel. `--stream` gives `start`, `step` (`subject`, then `tests`),
+`check`, `plan` (the number of tests and the suites; it may come again, smaller), `phase`, `test` and
+`error`.
 
 ## Credits
 
