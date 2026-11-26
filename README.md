@@ -103,6 +103,7 @@ the last steps.
 | Option | Effect |
 |---|---|
 | `--plain` | the report line by line, instead of the full screen |
+| `--no-color` | no colors |
 | `--seed N` | the seed of the random lines (42 by default) |
 | `--timeout S` | seconds a run may take (10 by default) |
 | `--only STEPS` | only these steps, comma separated: `lines,limits,stdin,fds,read_errors,malloc_failures,read_little,bonus,info` |
@@ -111,6 +112,7 @@ the last steps.
 | `--visualize` | open the visualizer at once (`--buffer-size N`: its `BUFFER_SIZE` at first, 8 by default) |
 | `--json FILE` | the results in JSON |
 | `--stream` | each event on a line of JSON, as it comes |
+| `--version` | the version |
 
 The exit code is `0` when everything passes, `1` when something fails, `2` for a wrong use.
 
