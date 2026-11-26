@@ -63,8 +63,8 @@ Your project is never touched: Linerator copies it (without the `.o` and `.a` fi
 | Around `BUFFER_SIZE` | lines from `n - 1` to `2n + 1` chars, with or without their newline, alone or in pairs, for 10 and 42 |
 | Standard input | fd 0, from a pipe |
 | File descriptors | `-1`, an fd never opened, an fd closed between two calls: `NULL` |
-| `read()` fails | `read()` returns -1 at its 1st, 2nd or 3rd call: `NULL` from there, and nothing left allocated. A file read up to the error, then opened again on the same fd, must be read from its start (the static cleared) |
-| `malloc()` fails | each `malloc` of a run in turn returns `NULL`: no crash, no leak, the lines before it right |
+| `read()` fails | `read()` returns -1 from its 1st, 2nd or 3rd call on: `NULL` from there, and nothing left allocated. A file read up to the error, then opened again on the same fd, must be read from its start (the static cleared) |
+| `malloc()` fails | each `malloc` of a run in turn returns `NULL`: no crash, the lines before it right; the run then goes on up to `NULL`, and nothing is left allocated |
 | Read as little as possible | the bytes read before the first line of a file of 1 MB: at most the line and one `BUFFER_SIZE` (more is a warning, the whole file a failure) |
 | Bonus | several fds read in turn, each keeping its own place; one static variable |
 | Undefined cases | a binary file, `BUFFER_SIZE=0`: what your get_next_line does, never counted |

@@ -10,7 +10,8 @@ from pathlib import Path
 
 FAKES = Path(__file__).resolve().parent / "fakes"
 MODES = {"good": 0, "leaks": 1, "no_terminator": 2, "no_newline": 3, "crash_long": 4, "stack_buffer": 5,
-	"reads_all": 6, "sees_read_errors": 7, "two_statics": 8}
+	"reads_all": 6, "sees_read_errors": 7, "two_statics": 8, "keeps_a_stash": 9, "loses_its_stash": 10,
+	"buffer_per_call": 11, "unterminated": 12}
 
 def make_project(folder, mode="good", bonus=False, name="get_next_line"):
 	project = Path(folder) / name

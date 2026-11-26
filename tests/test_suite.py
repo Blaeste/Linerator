@@ -5,8 +5,9 @@ import unittest
 from pathlib import Path
 
 from liner.build import Builder
-from liner.files import lines_of
-from liner.judge import Result, interleave, parse
+from liner.files import contents, lines_of, write_files
+from liner.judge import Result, interleave, judge_lines, parse
+from liner.run import run_program
 from liner.suite import MALLOC_FAILURES, judge_all, planned, run_suite
 from tests.fakes import make_project
 
@@ -149,6 +150,42 @@ class TestBrokenFakes(SuiteTestCase):
 		results = self.results("sees_read_errors", steps=("read_errors",))
 		self.assertEqual(results["read_errors/first_read"].status, "PASS")
 		self.assertEqual(results["read_errors/second_read_buffer_1"].status, "PASS")
+
+	def test_a_line_without_its_terminator_in_a_bigger_block(self):
+		# The bytes after the line are not zeros: strlen() runs up to the protected page.
+		results = self.results("unterminated", steps=("lines",))
+		self.assertEqual(results["buffer_42/few_lines"].status, "OOB")
+		self.assertEqual(results["buffer_1/few_lines"].status, "OOB")
+
+class TestAStash(SuiteTestCase):
+	"""A get_next_line that keeps a block from malloc between calls, like most of them do."""
+
+	def test_the_stash_freed_when_null_is_returned(self):
+		# The read() made to fail keeps failing, and the run goes on up to NULL after a failed malloc:
+		# what the next calls read again is freed at the end, so a correct stash is no leak.
+		results = self.results("keeps_a_stash", steps=("read_errors", "malloc_failures"))
+		bad = {name: f"{r.status} {r.detail}" for name, r in results.items() if r.status != "PASS"}
+		self.assertEqual(bad, {})
+		self.assertIn("malloc_failures/malloc_1", results)
+		self.assertIn("read_errors/first_read", results)
+
+	def test_the_stash_lost_on_an_error(self):
+		results = self.results("loses_its_stash", steps=("read_errors", "malloc_failures"))
+		self.assertEqual(results["read_errors/second_read_buffer_1"].status, "LEAK")
+		self.assertEqual(results["malloc_failures/malloc_2"].status, "LEAK")
+
+class TestABigBuffer(SuiteTestCase):
+
+	def test_a_buffer_of_buffer_size_from_malloc_at_each_call(self):
+		# 2000 lines, a block of 10 MB at each call: a big block is poisoned at its two ends only.
+		project = make_project(self.folder / "per_call", "buffer_per_call")
+		program, error = Builder(project, self.folder / "per_call" / "build").build(10000000)
+		self.assertIsNone(error)
+		paths = write_files(self.folder / "files")
+		run = run_program(program, ["lines", str(paths["many_lines"])], timeout=10)
+		result = judge_lines("buffer_10000000/many_lines", run, lines_of(contents()["many_lines"]), 10, 10000000)
+		self.assertEqual(result.status, "PASS", result.detail)
+		self.assertLess(run.ms, 5000)
 
 if __name__ == "__main__":
 	unittest.main()
