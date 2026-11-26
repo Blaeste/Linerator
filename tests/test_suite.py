@@ -5,8 +5,9 @@ import unittest
 from pathlib import Path
 
 from liner.build import Builder
-from liner.files import lines_of
-from liner.judge import Result, interleave, parse
+from liner.files import contents, lines_of, write_files
+from liner.judge import Result, interleave, judge_lines, parse
+from liner.run import run_program
 from liner.suite import MALLOC_FAILURES, judge_all, planned, run_suite
 from tests.fakes import make_project
 
@@ -172,6 +173,19 @@ class TestAStash(SuiteTestCase):
 		results = self.results("loses_its_stash", steps=("read_errors", "malloc_failures"))
 		self.assertEqual(results["read_errors/second_read_buffer_1"].status, "LEAK")
 		self.assertEqual(results["malloc_failures/malloc_2"].status, "LEAK")
+
+class TestABigBuffer(SuiteTestCase):
+
+	def test_a_buffer_of_buffer_size_from_malloc_at_each_call(self):
+		# 2000 lines, a block of 10 MB at each call: a big block is poisoned at its two ends only.
+		project = make_project(self.folder / "per_call", "buffer_per_call")
+		program, error = Builder(project, self.folder / "per_call" / "build").build(10000000)
+		self.assertIsNone(error)
+		paths = write_files(self.folder / "files")
+		run = run_program(program, ["lines", str(paths["many_lines"])], timeout=10)
+		result = judge_lines("buffer_10000000/many_lines", run, lines_of(contents()["many_lines"]), 10, 10000000)
+		self.assertEqual(result.status, "PASS", result.detail)
+		self.assertLess(run.ms, 5000)
 
 if __name__ == "__main__":
 	unittest.main()

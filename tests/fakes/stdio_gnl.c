@@ -6,6 +6,7 @@
 **   7 sees a failed read()                   8 one static too many
 **   9 keeps a block from malloc between calls (a stash), freed when it returns NULL
 **   10 like 9, but loses the stash without free() when NULL comes from an error
+**   11 a buffer of BUFFER_SIZE + 1 from malloc at each call
 **   12 a line without its terminator in a bigger block */
 #include <fcntl.h>
 #include <stdio.h>
@@ -97,6 +98,16 @@ char	*get_next_line(int fd)
 	}
 	if (stash[fd] == NULL && (stash[fd] = malloc(32)) == NULL)
 		return (NULL);
+#endif
+#if FAKE_MODE == 11
+	{
+		char	*buffer = malloc((size_t)BUFFER_SIZE + 1);
+
+		if (buffer == NULL)
+			return (NULL);
+		buffer[0] = '\0';
+		free(buffer);
+	}
 #endif
 	/* A closed fd: NULL, and what was kept for it is dropped. */
 	if (fcntl(fd, F_GETFD) < 0)
