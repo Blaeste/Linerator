@@ -150,5 +150,28 @@ class TestBrokenFakes(SuiteTestCase):
 		self.assertEqual(results["read_errors/first_read"].status, "PASS")
 		self.assertEqual(results["read_errors/second_read_buffer_1"].status, "PASS")
 
+	def test_a_line_without_its_terminator_in_a_bigger_block(self):
+		# The bytes after the line are not zeros: strlen() runs up to the protected page.
+		results = self.results("unterminated", steps=("lines",))
+		self.assertEqual(results["buffer_42/few_lines"].status, "OOB")
+		self.assertEqual(results["buffer_1/few_lines"].status, "OOB")
+
+class TestAStash(SuiteTestCase):
+	"""A get_next_line that keeps a block from malloc between calls, like most of them do."""
+
+	def test_the_stash_freed_when_null_is_returned(self):
+		# The read() made to fail keeps failing, and the run goes on up to NULL after a failed malloc:
+		# what the next calls read again is freed at the end, so a correct stash is no leak.
+		results = self.results("keeps_a_stash", steps=("read_errors", "malloc_failures"))
+		bad = {name: f"{r.status} {r.detail}" for name, r in results.items() if r.status != "PASS"}
+		self.assertEqual(bad, {})
+		self.assertIn("malloc_failures/malloc_1", results)
+		self.assertIn("read_errors/first_read", results)
+
+	def test_the_stash_lost_on_an_error(self):
+		results = self.results("loses_its_stash", steps=("read_errors", "malloc_failures"))
+		self.assertEqual(results["read_errors/second_read_buffer_1"].status, "LEAK")
+		self.assertEqual(results["malloc_failures/malloc_2"].status, "LEAK")
+
 if __name__ == "__main__":
 	unittest.main()

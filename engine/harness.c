@@ -10,15 +10,16 @@
 **   harness [options] first PATH      the first line only, then the counts (no leak check:
 **                                     what is left to read stays in the static)
 **
-** Options: --fail-malloc K (the malloc number K returns NULL), --fail-read K
-** (the read number K returns -1), --lang fr.
+** Options: --fail-malloc K (the malloc number K returns NULL; the lines are
+** then read up to NULL), --fail-read K (from the read number K on, every
+** read returns -1), --lang fr.
 **
 ** It prints one event a line on its standard output:
 **   L <len>       a line returned, then its bytes and a newline
 **   N             NULL returned
 **   F <i>         (multi) the next call reads the file number i
 **   R <ret> <n>   (trace) read(fd, buf, n) returned ret, then the bytes read and a newline
-**   X             the read() made to fail was called
+**   X             the first read() made to fail was called
 **   S reads=<calls> bytes=<read> first=<read before the first line> mallocs=<calls>
 **   !P            the end: nothing wrong; or !L, !M, !O, !C, !X and a message
 ** Memory: each block is next to a protected page and becomes unreachable when
@@ -37,6 +38,7 @@
 int				lft_en = 1;
 
 ssize_t			__real_read(int fd, void *buf, size_t n);
+int				lft_mf_injected(void);
 
 static long		g_read_calls;
 static long		g_read_fail_at;
@@ -51,9 +53,11 @@ ssize_t	__wrap_read(int fd, void *buf, size_t n)
 	ssize_t	ret;
 
 	g_read_calls++;
-	if (g_read_fail_all || (g_read_fail_at != 0 && g_read_calls == g_read_fail_at))
+	/* A broken fd stays broken: from the call K on, read() fails, NULL from there. */
+	if (g_read_fail_all || (g_read_fail_at != 0 && g_read_calls >= g_read_fail_at))
 	{
-		printf("X\n");
+		if (g_read_fail_all || g_read_calls == g_read_fail_at)
+			printf("X\n");
 		errno = EIO;
 		ret = -1;
 	}
@@ -137,6 +141,11 @@ static void	read_all(const char *path)
 	fd = open_path(path);
 	while (show(get_next_line(fd)))
 		;
+	/* A malloc made to fail ends the lines early: the next calls go on up to
+	** NULL, so that what they read again is freed at the end of the file. */
+	if (lft_mf_injected())
+		while (show(get_next_line(fd)))
+			;
 	/* Once NULL, NULL again. */
 	show(get_next_line(fd));
 	if (fd > 0)
